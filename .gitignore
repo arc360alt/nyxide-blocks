@@ -24,25 +24,21 @@ python_compressed.js
 .vscode
 
 /accessible/*
-/dist
 /msg/js/*
 !/msg/js/en.js
 /msg/json/*
 !/msg/json/en.json
-/blockly_compressed_horizontal.js
-/blockly_compressed_vertical.js
-/blockly_uncompressed_horizontal.js
-/blockly_uncompressed_vertical.js
-/blocks_compressed_horizontal.js
-/blocks_compressed_vertical.js
-/blocks_compressed.js
 /gh-pages/main.js
 /gh-pages/playgrounds
 /gh-pages/Gemfile.lock
 /gh-pages/closure-library
 /gh-pages/_site
 /*compiler*.jar
-/local_blockly_compressed_vertical.js
 /chromedriver
+
+# Compiled output is committed so `github:...#develop`-style installs work
+# without consumers needing Python/Java/webpack to build this package
+# themselves. A GitHub Actions workflow rebuilds and commits it on every
+# push to develop.
 # --flagfiles used on Windows
 /*.config
