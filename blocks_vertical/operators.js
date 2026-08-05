@@ -324,10 +324,10 @@ Blockly.Constants.Operators.EXPANDABLE_BOOLEAN_CHAIN_MUTATOR_MIXIN = {
     this.operandCount_ = 2;
     this.chainConnectorText_ = connectorText;
 
-    this.addOperandIcon_ = new Blockly.FieldMutatorIcon(
-        '+', 'addChainOperand_', 'blocklyMutatorIconText blocklyMutatorIconAdd');
-    this.removeOperandIcon_ = new Blockly.FieldMutatorIcon(
-        '-', 'removeChainOperand_', 'blocklyMutatorIconText blocklyMutatorIconRemove');
+    this.addOperandIcon_ =
+        new Blockly.FieldMutatorIcon('plus', 'addChainOperand_');
+    this.removeOperandIcon_ =
+        new Blockly.FieldMutatorIcon('minus', 'removeChainOperand_');
     this.appendDummyInput('CHAIN_CONTROLS')
         .appendField(this.addOperandIcon_, 'ADD_OPERAND')
         .appendField(this.removeOperandIcon_, 'REMOVE_OPERAND');
@@ -504,10 +504,9 @@ Blockly.Constants.Operators.EXPANDABLE_JOIN_MUTATOR_MIXIN = {
   setUpExpandableJoin_: function() {
     this.itemCount_ = 2;
 
-    this.addItemIcon_ = new Blockly.FieldMutatorIcon(
-        '+', 'addJoinItem_', 'blocklyMutatorIconText blocklyMutatorIconAdd');
-    this.removeItemIcon_ = new Blockly.FieldMutatorIcon(
-        '-', 'removeJoinItem_', 'blocklyMutatorIconText blocklyMutatorIconRemove');
+    this.addItemIcon_ = new Blockly.FieldMutatorIcon('plus', 'addJoinItem_');
+    this.removeItemIcon_ =
+        new Blockly.FieldMutatorIcon('minus', 'removeJoinItem_');
     this.appendDummyInput('JOIN_CONTROLS')
         .appendField(this.addItemIcon_, 'ADD_ITEM')
         .appendField(this.removeItemIcon_, 'REMOVE_ITEM');

@@ -177,15 +177,24 @@ Blockly.Blocks['control_if_else'] = {
  * Mixin adding "else if" / "else" branches to control_if and
  * control_if_else. Shared by both blocks; control_if starts with no else
  * branch, control_if_else starts with one (created dynamically, in the
- * same way the "+ else" button creates one) so the same shape-management
- * code can be reused for both.
+ * same way the "+" button creates one) so the same shape-management code
+ * can be reused for both.
+ *
+ * There is a single "+" button, not one button per kind of branch - what
+ * it does depends on the block's current last branch, it's not a choice
+ * the user makes: if there's no "else" branch yet, "+" adds one (bare if
+ * -> if/else); if there already is one, "+" inserts a new "else if" just
+ * before it (if/else -> if/elseif/else -> if/elseif/elseif/else -> ...).
+ * "-" always undoes whatever "+" would do next, in reverse: it removes the
+ * most recently added "else if" if there is one, otherwise it removes the
+ * "else" branch.
  * @mixin
  * @package
  */
 Blockly.Constants.Control.EXPANDABLE_IF_MUTATOR_MIXIN = {
   /**
    * Set up the initial mutation state and append the control row with the
-   * "+ else if" / "+ else" / "-" buttons.
+   * "+" / "-" buttons.
    * @param {boolean} hasElseByDefault Whether this block starts out with an
    *     else branch (true for control_if_else, false for control_if).
    * @this Blockly.Block
@@ -197,15 +206,11 @@ Blockly.Constants.Control.EXPANDABLE_IF_MUTATOR_MIXIN = {
     this.hasElseByDefault_ = hasElseByDefault;
 
     this.appendDummyInput('IF_CONTROLS').setAlign(Blockly.ALIGN_RIGHT);
-    this.addElseIfIcon_ = new Blockly.FieldMutatorIcon(
-        '+ else if', 'addElseIfBranch_', 'blocklyMutatorIconText blocklyMutatorIconAdd');
-    this.addElseIcon_ = new Blockly.FieldMutatorIcon(
-        '+ else', 'addElseBranch_', 'blocklyMutatorIconText blocklyMutatorIconAdd');
-    this.removeBranchIcon_ = new Blockly.FieldMutatorIcon(
-        '-', 'removeLastBranch_', 'blocklyMutatorIconText blocklyMutatorIconRemove');
+    this.addBranchIcon_ = new Blockly.FieldMutatorIcon('plus', 'addBranch_');
+    this.removeBranchIcon_ =
+        new Blockly.FieldMutatorIcon('minus', 'removeLastBranch_');
     this.getInput('IF_CONTROLS')
-        .appendField(this.addElseIfIcon_, 'ADD_ELSEIF')
-        .appendField(this.addElseIcon_, 'ADD_ELSE')
+        .appendField(this.addBranchIcon_, 'ADD_BRANCH')
         .appendField(this.removeBranchIcon_, 'REMOVE_BRANCH');
 
     if (hasElseByDefault) {
@@ -271,13 +276,15 @@ Blockly.Constants.Control.EXPANDABLE_IF_MUTATOR_MIXIN = {
   },
 
   /**
-   * Appends one more "else if <condition> then" branch, just above the
-   * control row. CONTROL_ELSEIF is a message with a %1 placeholder (like
-   * CONTROL_IF's "if %1 then"); since this input is built by hand rather
-   * than through jsonInit's own message interpolation, the text before and
-   * after the placeholder is split out manually and attached the same way
-   * jsonInit would: the leading text on the condition input itself, and any
-   * trailing text ("then") on a following dummy input that shares its row.
+   * Appends one more "else if <condition> then" branch, positioned just
+   * before the "else" branch if one exists (so "else" always stays last),
+   * or just above the control row otherwise. CONTROL_ELSEIF is a message
+   * with a %1 placeholder (like CONTROL_IF's "if %1 then"); since this
+   * input is built by hand rather than through jsonInit's own message
+   * interpolation, the text before and after the placeholder is split out
+   * manually and attached the same way jsonInit would: the leading text on
+   * the condition input itself, and any trailing text ("then") on a
+   * following dummy input that shares its row.
    * @this Blockly.Block
    */
   appendElseIfBranch_: function() {
@@ -294,15 +301,16 @@ Blockly.Constants.Control.EXPANDABLE_IF_MUTATOR_MIXIN = {
       this.appendDummyInput('ELSEIF_THEN' + n).appendField(afterText);
     }
     this.appendStatementInput('ELSEIF_SUBSTACK' + n);
-    // Each moveInputBefore lands its input immediately in front of
-    // IF_CONTROLS, i.e. immediately after whatever was moved there just
-    // before it - so these must run in the same order the inputs should
-    // visually appear.
-    this.moveInputBefore('ELSEIF_CONDITION' + n, 'IF_CONTROLS');
+    // Each moveInputBefore lands its input immediately in front of the
+    // anchor, i.e. immediately after whatever was moved there just before
+    // it - so these must run in the same order the inputs should visually
+    // appear. Anchoring on ELSE_LABEL (when present) keeps "else" last.
+    var anchor = this.hasElse_ ? 'ELSE_LABEL' : 'IF_CONTROLS';
+    this.moveInputBefore('ELSEIF_CONDITION' + n, anchor);
     if (afterText) {
-      this.moveInputBefore('ELSEIF_THEN' + n, 'IF_CONTROLS');
+      this.moveInputBefore('ELSEIF_THEN' + n, anchor);
     }
-    this.moveInputBefore('ELSEIF_SUBSTACK' + n, 'IF_CONTROLS');
+    this.moveInputBefore('ELSEIF_SUBSTACK' + n, anchor);
   },
 
   /**
@@ -348,50 +356,44 @@ Blockly.Constants.Control.EXPANDABLE_IF_MUTATOR_MIXIN = {
   },
 
   /**
-   * Shows/hides the "+ else if", "+ else" and "-" buttons depending on the
-   * current shape: once an "else" branch exists nothing more can be added
-   * after it, and the "-" button only appears once there is something to
-   * remove.
+   * Shows/hides the "-" button depending on the current shape: "+" is
+   * always available (there's always something more it can add), but "-"
+   * only appears once there's something to remove.
    * @this Blockly.Block
    */
   updateIfControlsVisibility_: function() {
-    this.addElseIfIcon_.setVisible(!this.hasElse_);
-    this.addElseIcon_.setVisible(!this.hasElse_);
     this.removeBranchIcon_.setVisible(this.hasElse_ || this.elseifCount_ > 0);
   },
 
   /**
-   * Click handler for the "+ else if" button.
+   * Click handler for the "+" button. What it adds is not a user choice:
+   * if there's no "else" branch yet, this adds one; if there already is
+   * one, this inserts a new "else if" just before it.
    * @this Blockly.Block
    */
-  addElseIfBranch_: function() {
+  addBranch_: function() {
     Blockly.Constants.Control.applyIfMutation_(this, function(block) {
-      block.appendElseIfBranch_();
-    });
-  },
-
-  /**
-   * Click handler for the "+ else" button.
-   * @this Blockly.Block
-   */
-  addElseBranch_: function() {
-    Blockly.Constants.Control.applyIfMutation_(this, function(block) {
-      block.appendElseBranch_();
+      if (block.hasElse_) {
+        block.appendElseIfBranch_();
+      } else {
+        block.appendElseBranch_();
+      }
       block.updateIfControlsVisibility_();
     });
   },
 
   /**
-   * Click handler for the "-" button: removes the "else" branch if one is
-   * present, otherwise removes the most recently added "else if" branch.
+   * Click handler for the "-" button: always undoes whatever "+" would do
+   * next, in reverse. Removes the most recently added "else if" branch if
+   * there is one, otherwise removes the "else" branch.
    * @this Blockly.Block
    */
   removeLastBranch_: function() {
     Blockly.Constants.Control.applyIfMutation_(this, function(block) {
-      if (block.hasElse_) {
-        block.removeElseBranch_();
-      } else {
+      if (block.elseifCount_ > 0) {
         block.removeLastElseIfBranch_();
+      } else {
+        block.removeElseBranch_();
       }
       block.updateIfControlsVisibility_();
     });

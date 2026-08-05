@@ -476,19 +476,6 @@ Blockly.Css.CONTENT = [
     'font-size: 11pt;',
   '}',
 
-  '.blocklyMutatorIconText {',
-    'font-weight: 700;',
-    'cursor: pointer;',
-  '}',
-
-  '.blocklyMutatorIconAdd {',
-    'fill: #389438;',
-  '}',
-
-  '.blocklyMutatorIconRemove {',
-    'fill: #CF4444;',
-  '}',
-
   '.blocklyNonEditableText>text {',
     'pointer-events: none;',
   '}',
