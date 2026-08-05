@@ -51,6 +51,20 @@ Blockly.FieldMutatorIcon = function(text, callbackName, opt_class) {
 goog.inherits(Blockly.FieldMutatorIcon, Blockly.FieldLabel);
 
 /**
+ * Construct a FieldMutatorIcon from a JSON arg object.
+ * @param {!Object} options A JSON object with options (text, callbackName,
+ *     and class).
+ * @returns {!Blockly.FieldMutatorIcon} The new field instance.
+ * @package
+ * @nocollapse
+ */
+Blockly.FieldMutatorIcon.fromJson = function(options) {
+  var text = Blockly.utils.replaceMessageReferences(options['text']);
+  return new Blockly.FieldMutatorIcon(
+      text, options['callbackName'], options['class']);
+};
+
+/**
  * Mutator icons are clickable, unlike normal labels.
  * @type {boolean}
  */
