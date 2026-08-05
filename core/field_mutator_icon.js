@@ -26,9 +26,20 @@
  * FieldLabel's init() intentionally skips wiring up mouse-down handling
  * since labels are meant to be non-interactive, so a FieldLabel-based
  * button is never actually clickable. It also draws its own fixed-size
- * vector icon rather than relying on text-width measurement, which is
+ * vector icon (a filled circle behind a plain "+"/"-" glyph, like a real
+ * button) rather than relying on text-width measurement, which is
  * unreliable (and can be permanently cached wrong) for fields that may be
  * created before the block is attached to the visible document.
+ *
+ * Host apps built on this library sometimes wire up "click a block to run
+ * it" by listening for raw mouse events on the workspace, rather than only
+ * Blockly's own field-vs-block click disambiguation. Blockly's field click
+ * handling does not stop the originating mousedown/mouseup/click from
+ * continuing to bubble past the field, so a click on this icon can still
+ * be picked up by that kind of outer listener and run the block in
+ * addition to triggering the icon's own action. To be safe regardless of
+ * how the host app wires up block-running, this field stops propagation
+ * on those events itself once it has handled them.
  * @author nyxide-blocks
  */
 'use strict';
@@ -72,19 +83,25 @@ Blockly.FieldMutatorIcon.fromJson = function(options) {
 
 /**
  * Footprint of the icon, in workspace units. Fixed and never recomputed
- * from text metrics, so the block's layout is always deterministic.
+ * from text metrics, so the block's layout is always deterministic. Sized
+ * to be comfortably clickable, not just visible.
  */
-Blockly.FieldMutatorIcon.SIZE = 20;
+Blockly.FieldMutatorIcon.SIZE = 26;
+
+/**
+ * Radius of the button's background circle.
+ */
+Blockly.FieldMutatorIcon.BUTTON_RADIUS = 11;
 
 /**
  * Length of each bar making up the drawn "+"/"-" glyph.
  */
-Blockly.FieldMutatorIcon.BAR_LENGTH = 10;
+Blockly.FieldMutatorIcon.BAR_LENGTH = 12;
 
 /**
  * Thickness of each bar making up the drawn "+"/"-" glyph.
  */
-Blockly.FieldMutatorIcon.BAR_THICKNESS = 2;
+Blockly.FieldMutatorIcon.BAR_THICKNESS = 2.5;
 
 /**
  * Mutator icons are clickable, unlike normal labels.
@@ -107,7 +124,9 @@ Blockly.FieldMutatorIcon.prototype.CURSOR = 'pointer';
  * Install this icon on a block. Calls through to Blockly.Field's own init
  * (unlike FieldLabel) so that mouse-down handling and editable styling get
  * wired up normally, then hides the (unused) base text element and draws
- * the actual "+"/"-" glyph as plain white SVG bars.
+ * an actual button: a dark circular background (so it reads as clickable
+ * against any block colour, and gives a bigger hit target than the glyph
+ * alone) with a plain white "+"/"-" glyph on top.
  */
 Blockly.FieldMutatorIcon.prototype.init = function() {
   if (this.fieldGroup_) {
@@ -124,6 +143,15 @@ Blockly.FieldMutatorIcon.prototype.init = function() {
 
   this.iconGroup_ = Blockly.utils.createSvgElement(
       'g', {'class': 'blocklyMutatorIconGraphic'}, this.fieldGroup_);
+  // Button background, so this reads as a clickable button rather than
+  // bare glyphs floating on the block, and so there's a comfortably large
+  // hit target beyond just the thin bars.
+  Blockly.utils.createSvgElement('circle', {
+    'cx': half,
+    'cy': half,
+    'r': Blockly.FieldMutatorIcon.BUTTON_RADIUS,
+    'class': 'blocklyMutatorIconBackground'
+  }, this.iconGroup_);
   // Horizontal bar - present for both the "+" and "-" glyphs.
   Blockly.utils.createSvgElement('rect', {
     'x': half - barLength / 2,
@@ -146,6 +174,21 @@ Blockly.FieldMutatorIcon.prototype.init = function() {
       'fill': '#ffffff'
     }, this.iconGroup_);
   }
+
+  // Host apps sometimes run a block on any raw native 'click' within its
+  // bounds, listening higher up the DOM tree than this field - Blockly's
+  // own gesture system never uses native 'click' events (only mousedown/
+  // mousemove/mouseup), so it's safe to swallow this one here without
+  // touching anything Blockly itself depends on. mousedown/mouseup are
+  // deliberately left alone: Blockly's own gesture start (on the
+  // workspace's mousedown handler) and click-vs-drag resolution (on a
+  // document-level mouseup handler) both depend on those events reaching
+  // ancestors above this field, so stopping them here would silently
+  // break this field's own clickability again, along with the rest of the
+  // gesture system.
+  this.fieldGroup_.addEventListener('click', function(e) {
+    e.stopPropagation();
+  });
 };
 
 /**

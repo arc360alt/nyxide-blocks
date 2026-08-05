@@ -476,6 +476,20 @@ Blockly.Css.CONTENT = [
     'font-size: 11pt;',
   '}',
 
+  '.blocklyMutatorIconGraphic {',
+    'cursor: pointer;',
+  '}',
+
+  '.blocklyMutatorIconBackground {',
+    'fill: rgba(0, 0, 0, 0.25);',
+    'stroke: rgba(255, 255, 255, 0.4);',
+    'stroke-width: 1;',
+  '}',
+
+  '.blocklyMutatorIconGraphic:hover .blocklyMutatorIconBackground {',
+    'fill: rgba(0, 0, 0, 0.4);',
+  '}',
+
   '.blocklyNonEditableText>text {',
     'pointer-events: none;',
   '}',
