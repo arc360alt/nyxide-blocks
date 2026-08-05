@@ -467,6 +467,7 @@ Blockly.Blocks.defaultToolbox = '<xml id="toolbox-categories" style="display: no
         '</shadow>' +
       '</value>' +
     '</block>' +
+    '<block type="operator_newline" id="operator_newline"></block>' +
     '<block type="operator_letter_of" id="operator_letter_of">' +
       '<value name="LETTER">' +
         '<shadow type="math_whole_number">' +

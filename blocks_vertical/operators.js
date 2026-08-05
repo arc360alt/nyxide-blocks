@@ -651,6 +651,24 @@ Blockly.Extensions.registerMutator('operator_join_mutator',
       this.setUpExpandableJoin_();
     });
 
+Blockly.Blocks['operator_newline'] = {
+  /**
+   * Block for a literal newline character. A plain reporter with no
+   * inputs, string-shaped so it can be plugged into any text field (join,
+   * say, extensions that render text, etc.) - unlike typing "\n" into a
+   * text field, which most string-input UIs treat as two literal
+   * characters, this always evaluates to one real line break.
+   * @this Blockly.Block
+   */
+  init: function() {
+    this.jsonInit({
+      "message0": Blockly.Msg.OPERATORS_NEWLINE,
+      "category": Blockly.Categories.operators,
+      "extensions": ["colours_operators", "output_string"]
+    });
+  }
+};
+
 Blockly.Blocks['operator_letter_of'] = {
   /**
    * Block for "letter _ of _" operator.

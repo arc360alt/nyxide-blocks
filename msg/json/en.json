@@ -153,6 +153,7 @@
     "OPERATORS_JOIN": "join %1 %2",
     "OPERATORS_JOIN_APPLE": "apple",
     "OPERATORS_JOIN_BANANA": "banana",
+    "OPERATORS_NEWLINE": "new line",
     "OPERATORS_LETTEROF": "letter %1 of %2",
     "OPERATORS_LETTEROF_APPLE": "a",
     "OPERATORS_LENGTH": "length of %1",
