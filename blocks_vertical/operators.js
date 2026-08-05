@@ -21,11 +21,15 @@
 'use strict';
 
 goog.provide('Blockly.Blocks.operators');
+goog.provide('Blockly.Constants.Operators');
 
 goog.require('Blockly.Blocks');
 goog.require('Blockly.Colours');
 goog.require('Blockly.constants');
+goog.require('Blockly.Extensions');
+goog.require('Blockly.FieldMutatorIcon');
 goog.require('Blockly.ScratchBlocks.VerticalExtensions');
+goog.require('Blockly.Xml');
 
 
 Blockly.Blocks['operator_add'] = {
@@ -222,7 +226,10 @@ Blockly.Blocks['operator_gt'] = {
 
 Blockly.Blocks['operator_and'] = {
   /**
-   * Block for "and" boolean comparator.
+   * Block for "and" boolean comparator. Expandable: a "+"/"-" pair lets the
+   * user chain on more operands ("a and b and c ..."). Blocks saved before
+   * this feature existed have no <mutation> and load with exactly the
+   * original two-operand shape, so this is fully backwards compatible.
    * @this Blockly.Block
    */
   init: function() {
@@ -241,6 +248,7 @@ Blockly.Blocks['operator_and'] = {
         }
       ],
       "category": Blockly.Categories.operators,
+      "mutator": "operator_and_mutator",
       "extensions": ["colours_operators", "output_boolean"]
     });
   }
@@ -248,7 +256,10 @@ Blockly.Blocks['operator_and'] = {
 
 Blockly.Blocks['operator_or'] = {
   /**
-   * Block for "or" boolean comparator.
+   * Block for "or" boolean comparator. Expandable: a "+"/"-" pair lets the
+   * user chain on more operands ("a or b or c ..."). Blocks saved before
+   * this feature existed have no <mutation> and load with exactly the
+   * original two-operand shape, so this is fully backwards compatible.
    * @this Blockly.Block
    */
   init: function() {
@@ -267,10 +278,169 @@ Blockly.Blocks['operator_or'] = {
         }
       ],
       "category": Blockly.Categories.operators,
+      "mutator": "operator_or_mutator",
       "extensions": ["colours_operators", "output_boolean"]
     });
   }
 };
+
+/**
+ * Generic helper for applying a shape-changing function to an expandable
+ * operator block: re-renders it and fires a 'mutation' change event if the
+ * shape actually changed, so the change is undoable.
+ * @param {!Blockly.Block} block
+ * @param {function(!Blockly.Block)} mutateFn
+ * @private
+ */
+Blockly.Constants.Operators.applyMutation_ = function(block, mutateFn) {
+  var oldMutationDom = block.mutationToDom();
+  var oldMutation = oldMutationDom && Blockly.Xml.domToText(oldMutationDom);
+  mutateFn(block);
+  if (block.rendered) {
+    block.render();
+    block.bumpNeighbours_();
+  }
+  var newMutationDom = block.mutationToDom();
+  var newMutation = newMutationDom && Blockly.Xml.domToText(newMutationDom);
+  if (Blockly.Events.isEnabled() && oldMutation != newMutation) {
+    Blockly.Events.fire(new Blockly.Events.BlockChange(
+        block, 'mutation', null, oldMutation, newMutation));
+  }
+};
+
+/**
+ * Mixin adding extra chained operands to operator_and / operator_or. Both
+ * blocks start with OPERAND1/OPERAND2 from jsonInit; this appends
+ * OPERAND3, OPERAND4, ... as the user clicks "+".
+ * @mixin
+ * @package
+ */
+Blockly.Constants.Operators.EXPANDABLE_BOOLEAN_CHAIN_MUTATOR_MIXIN = {
+  /**
+   * @param {string} connectorText The word shown before each extra operand
+   *     ("and"/"or").
+   * @this Blockly.Block
+   * @package
+   */
+  setUpExpandableChain_: function(connectorText) {
+    this.operandCount_ = 2;
+    this.chainConnectorText_ = connectorText;
+
+    this.addOperandIcon_ = new Blockly.FieldMutatorIcon(
+        '+', 'addChainOperand_', 'blocklyMutatorIconText blocklyMutatorIconAdd');
+    this.removeOperandIcon_ = new Blockly.FieldMutatorIcon(
+        '-', 'removeChainOperand_', 'blocklyMutatorIconText blocklyMutatorIconRemove');
+    this.appendDummyInput('CHAIN_CONTROLS')
+        .appendField(this.addOperandIcon_, 'ADD_OPERAND')
+        .appendField(this.removeOperandIcon_, 'REMOVE_OPERAND');
+    this.updateChainControlsVisibility_();
+  },
+
+  /**
+   * @return {Element} A <mutation> element with the current operand count,
+   *     or null if this block still has just its original two operands.
+   * @this Blockly.Block
+   */
+  mutationToDom: function() {
+    if (this.operandCount_ === 2) {
+      return null;
+    }
+    var container = document.createElement('mutation');
+    container.setAttribute('items', this.operandCount_);
+    return container;
+  },
+
+  /**
+   * @param {!Element} xmlElement Contains the number of operands.
+   * @this Blockly.Block
+   */
+  domToMutation: function(xmlElement) {
+    var target = parseInt(xmlElement.getAttribute('items'), 10) || 2;
+    this.updateChainShape_(target);
+  },
+
+  /**
+   * @param {number} targetCount
+   * @this Blockly.Block
+   */
+  updateChainShape_: function(targetCount) {
+    targetCount = Math.max(2, targetCount);
+    while (this.operandCount_ > targetCount) {
+      this.removeLastChainOperand_();
+    }
+    while (this.operandCount_ < targetCount) {
+      this.appendChainOperand_();
+    }
+    this.updateChainControlsVisibility_();
+  },
+
+  /**
+   * @this Blockly.Block
+   */
+  appendChainOperand_: function() {
+    this.operandCount_++;
+    var n = this.operandCount_;
+    this.appendValueInput('OPERAND' + n)
+        .setCheck('Boolean')
+        .appendField(this.chainConnectorText_);
+    this.moveInputBefore('OPERAND' + n, 'CHAIN_CONTROLS');
+  },
+
+  /**
+   * Removes the most recently added operand. Any block plugged into it is
+   * unplugged, not deleted. Never removes below the original two operands.
+   * @this Blockly.Block
+   */
+  removeLastChainOperand_: function() {
+    if (this.operandCount_ <= 2) {
+      return;
+    }
+    var n = this.operandCount_;
+    this.removeInput('OPERAND' + n);
+    this.operandCount_--;
+  },
+
+  /**
+   * @this Blockly.Block
+   */
+  updateChainControlsVisibility_: function() {
+    this.removeOperandIcon_.setVisible(this.operandCount_ > 2);
+  },
+
+  /**
+   * Click handler for the "+" button.
+   * @this Blockly.Block
+   */
+  addChainOperand_: function() {
+    Blockly.Constants.Operators.applyMutation_(this, function(block) {
+      block.appendChainOperand_();
+      block.updateChainControlsVisibility_();
+    });
+  },
+
+  /**
+   * Click handler for the "-" button.
+   * @this Blockly.Block
+   */
+  removeChainOperand_: function() {
+    Blockly.Constants.Operators.applyMutation_(this, function(block) {
+      block.removeLastChainOperand_();
+      block.updateChainControlsVisibility_();
+    });
+  }
+};
+
+Blockly.Extensions.registerMutator('operator_and_mutator',
+    Blockly.Constants.Operators.EXPANDABLE_BOOLEAN_CHAIN_MUTATOR_MIXIN,
+    function() {
+      this.setUpExpandableChain_(Blockly.Msg.OPERATORS_AND_CONNECTOR || 'and');
+    });
+
+Blockly.Extensions.registerMutator('operator_or_mutator',
+    Blockly.Constants.Operators.EXPANDABLE_BOOLEAN_CHAIN_MUTATOR_MIXIN,
+    function() {
+      this.setUpExpandableChain_(Blockly.Msg.OPERATORS_OR_CONNECTOR || 'or');
+    });
 
 Blockly.Blocks['operator_not'] = {
   /**
@@ -295,7 +465,10 @@ Blockly.Blocks['operator_not'] = {
 
 Blockly.Blocks['operator_join'] = {
   /**
-   * Block for string join operator.
+   * Block for string join operator. Expandable: a "+"/"-" pair lets the
+   * user join more than two strings together. Blocks saved before this
+   * feature existed have no <mutation> and load with exactly the original
+   * two-string shape, so this is fully backwards compatible.
    * @this Blockly.Block
    */
   init: function() {
@@ -312,10 +485,133 @@ Blockly.Blocks['operator_join'] = {
         }
       ],
       "category": Blockly.Categories.operators,
+      "mutator": "operator_join_mutator",
       "extensions": ["colours_operators", "output_string"]
     });
   }
 };
+
+/**
+ * Mixin adding extra chained strings to operator_join. The block starts
+ * with STRING1/STRING2 from jsonInit; this appends STRING3, STRING4, ...
+ * as the user clicks "+".
+ * @mixin
+ * @package
+ */
+Blockly.Constants.Operators.EXPANDABLE_JOIN_MUTATOR_MIXIN = {
+  /**
+   * @this Blockly.Block
+   * @package
+   */
+  setUpExpandableJoin_: function() {
+    this.itemCount_ = 2;
+
+    this.addItemIcon_ = new Blockly.FieldMutatorIcon(
+        '+', 'addJoinItem_', 'blocklyMutatorIconText blocklyMutatorIconAdd');
+    this.removeItemIcon_ = new Blockly.FieldMutatorIcon(
+        '-', 'removeJoinItem_', 'blocklyMutatorIconText blocklyMutatorIconRemove');
+    this.appendDummyInput('JOIN_CONTROLS')
+        .appendField(this.addItemIcon_, 'ADD_ITEM')
+        .appendField(this.removeItemIcon_, 'REMOVE_ITEM');
+    this.updateJoinControlsVisibility_();
+  },
+
+  /**
+   * @return {Element} A <mutation> element with the current string count,
+   *     or null if this block still has just its original two strings.
+   * @this Blockly.Block
+   */
+  mutationToDom: function() {
+    if (this.itemCount_ === 2) {
+      return null;
+    }
+    var container = document.createElement('mutation');
+    container.setAttribute('items', this.itemCount_);
+    return container;
+  },
+
+  /**
+   * @param {!Element} xmlElement Contains the number of strings.
+   * @this Blockly.Block
+   */
+  domToMutation: function(xmlElement) {
+    var target = parseInt(xmlElement.getAttribute('items'), 10) || 2;
+    this.updateJoinShape_(target);
+  },
+
+  /**
+   * @param {number} targetCount
+   * @this Blockly.Block
+   */
+  updateJoinShape_: function(targetCount) {
+    targetCount = Math.max(2, targetCount);
+    while (this.itemCount_ > targetCount) {
+      this.removeLastJoinItem_();
+    }
+    while (this.itemCount_ < targetCount) {
+      this.appendJoinItem_();
+    }
+    this.updateJoinControlsVisibility_();
+  },
+
+  /**
+   * @this Blockly.Block
+   */
+  appendJoinItem_: function() {
+    this.itemCount_++;
+    this.appendValueInput('STRING' + this.itemCount_);
+    this.moveInputBefore('STRING' + this.itemCount_, 'JOIN_CONTROLS');
+  },
+
+  /**
+   * Removes the most recently added string input. Any block plugged into
+   * it is unplugged, not deleted. Never removes below the original two
+   * strings.
+   * @this Blockly.Block
+   */
+  removeLastJoinItem_: function() {
+    if (this.itemCount_ <= 2) {
+      return;
+    }
+    this.removeInput('STRING' + this.itemCount_);
+    this.itemCount_--;
+  },
+
+  /**
+   * @this Blockly.Block
+   */
+  updateJoinControlsVisibility_: function() {
+    this.removeItemIcon_.setVisible(this.itemCount_ > 2);
+  },
+
+  /**
+   * Click handler for the "+" button.
+   * @this Blockly.Block
+   */
+  addJoinItem_: function() {
+    Blockly.Constants.Operators.applyMutation_(this, function(block) {
+      block.appendJoinItem_();
+      block.updateJoinControlsVisibility_();
+    });
+  },
+
+  /**
+   * Click handler for the "-" button.
+   * @this Blockly.Block
+   */
+  removeJoinItem_: function() {
+    Blockly.Constants.Operators.applyMutation_(this, function(block) {
+      block.removeLastJoinItem_();
+      block.updateJoinControlsVisibility_();
+    });
+  }
+};
+
+Blockly.Extensions.registerMutator('operator_join_mutator',
+    Blockly.Constants.Operators.EXPANDABLE_JOIN_MUTATOR_MIXIN,
+    function() {
+      this.setUpExpandableJoin_();
+    });
 
 Blockly.Blocks['operator_letter_of'] = {
   /**
