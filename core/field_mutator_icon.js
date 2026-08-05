@@ -201,6 +201,26 @@ Blockly.FieldMutatorIcon.prototype.updateWidth = function() {
 };
 
 /**
+ * Blockly.Field's own render_() only recomputes width while becoming
+ * visible (it does nothing at all while hidden) - so a field that was
+ * shown and is now being hidden again keeps its old, visible-state width
+ * forever, and every block layout pass keeps reserving space for it even
+ * though nothing is drawn there. That's exactly what these icons need to
+ * do: an add/remove button toggles visible over and over as the block's
+ * shape changes. Explicitly zero the width whenever this becomes
+ * invisible so the block actually shrinks back down; showing it again
+ * still goes through the normal base behaviour, which recomputes it via
+ * updateWidth() above.
+ * @param {boolean} visible True if visible.
+ */
+Blockly.FieldMutatorIcon.prototype.setVisible = function(visible) {
+  Blockly.FieldMutatorIcon.superClass_.setVisible.call(this, visible);
+  if (!visible) {
+    this.size_.width = 0;
+  }
+};
+
+/**
  * There is no editor to show; instead invoke the callback on the source
  * block, if one is registered.
  * @private

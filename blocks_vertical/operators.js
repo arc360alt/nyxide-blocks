@@ -282,6 +282,37 @@ Blockly.Blocks['operator_or'] = {
 };
 
 /**
+ * Plugs a default editable "text" shadow block into a value input, the
+ * same way the toolbox pre-fills operator_join's STRING1/STRING2 with
+ * "apple"/"banana" shadows. Mirrors
+ * Blockly.ScratchBlocks.ProcedureUtils.attachShadow_'s string-argument
+ * case.
+ * @param {!Blockly.Input} input The value input to attach a shadow to.
+ * @this Blockly.Block
+ * @private
+ */
+Blockly.Constants.Operators.attachTextShadow_ = function(input) {
+  if (this.isInsertionMarker()) {
+    return;
+  }
+  Blockly.Events.disable();
+  var shadowBlock;
+  try {
+    shadowBlock = this.workspace.newBlock('text');
+    shadowBlock.setFieldValue('', 'TEXT');
+    shadowBlock.setShadow(true);
+    shadowBlock.initSvg();
+    shadowBlock.render(false);
+  } finally {
+    Blockly.Events.enable();
+  }
+  if (Blockly.Events.isEnabled()) {
+    Blockly.Events.fire(new Blockly.Events.BlockCreate(shadowBlock));
+  }
+  shadowBlock.outputConnection.connect(input.connection);
+};
+
+/**
  * Generic helper for applying a shape-changing function to an expandable
  * operator block: re-renders it and fires a 'mutation' change event if the
  * shape actually changed, so the change is undoable.
@@ -561,8 +592,13 @@ Blockly.Constants.Operators.EXPANDABLE_JOIN_MUTATOR_MIXIN = {
    */
   appendJoinItem_: function() {
     this.itemCount_++;
-    this.appendValueInput('STRING' + this.itemCount_);
+    var input = this.appendValueInput('STRING' + this.itemCount_);
     this.moveInputBefore('STRING' + this.itemCount_, 'JOIN_CONTROLS');
+    // STRING1/STRING2 come from the toolbox with an editable "text" shadow
+    // block already plugged in (that's the "apple"/"banana" default) - an
+    // empty value input with no shadow just looks like a dead-end round
+    // hole with nothing typeable in it. Match that for new slots too.
+    Blockly.Constants.Operators.attachTextShadow_.call(this, input);
   },
 
   /**
