@@ -26,10 +26,7 @@ goog.provide('Blockly.Constants.Control');
 goog.require('Blockly.Blocks');
 goog.require('Blockly.Colours');
 goog.require('Blockly.constants');
-goog.require('Blockly.Extensions');
-goog.require('Blockly.FieldMutatorIcon');
 goog.require('Blockly.ScratchBlocks.VerticalExtensions');
-goog.require('Blockly.Xml');
 
 
 Blockly.Blocks['control_forever'] = {
@@ -253,8 +250,8 @@ Blockly.Constants.Control.EXPANDABLE_IF_MUTATOR_MIXIN = {
    * Reconciles the block's inputs with the desired number of "else if"
    * branches and whether an "else" branch should be present, preserving
    * any blocks already connected to branches that remain.
-   * @param {number} targetElseifCount
-   * @param {boolean} targetHasElse
+   * @param {number} targetElseifCount Desired number of "else if" branches.
+   * @param {boolean} targetHasElse Whether an "else" branch should exist.
    * @this Blockly.Block
    */
   updateIfShape_: function(targetElseifCount, targetHasElse) {
@@ -406,8 +403,9 @@ Blockly.Constants.Control.EXPANDABLE_IF_MUTATOR_MIXIN = {
  * updating its control button visibility, re-rendering it, and firing a
  * 'mutation' change event if the shape actually changed (so this is
  * undoable, matching how Blockly.Mutator drag-and-drop mutations behave).
- * @param {!Blockly.Block} block
- * @param {function(!Blockly.Block)} mutateFn
+ * @param {!Blockly.Block} block The block to mutate.
+ * @param {function(!Blockly.Block)} mutateFn Callback that performs the
+ *     actual shape change.
  * @private
  */
 Blockly.Constants.Control.applyIfMutation_ = function(block, mutateFn) {

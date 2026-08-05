@@ -26,10 +26,7 @@ goog.provide('Blockly.Constants.Operators');
 goog.require('Blockly.Blocks');
 goog.require('Blockly.Colours');
 goog.require('Blockly.constants');
-goog.require('Blockly.Extensions');
-goog.require('Blockly.FieldMutatorIcon');
 goog.require('Blockly.ScratchBlocks.VerticalExtensions');
-goog.require('Blockly.Xml');
 
 
 Blockly.Blocks['operator_add'] = {
@@ -288,8 +285,9 @@ Blockly.Blocks['operator_or'] = {
  * Generic helper for applying a shape-changing function to an expandable
  * operator block: re-renders it and fires a 'mutation' change event if the
  * shape actually changed, so the change is undoable.
- * @param {!Blockly.Block} block
- * @param {function(!Blockly.Block)} mutateFn
+ * @param {!Blockly.Block} block The block to mutate.
+ * @param {function(!Blockly.Block)} mutateFn Callback that performs the
+ *     actual shape change.
  * @private
  */
 Blockly.Constants.Operators.applyMutation_ = function(block, mutateFn) {
@@ -360,7 +358,7 @@ Blockly.Constants.Operators.EXPANDABLE_BOOLEAN_CHAIN_MUTATOR_MIXIN = {
   },
 
   /**
-   * @param {number} targetCount
+   * @param {number} targetCount Desired number of inputs.
    * @this Blockly.Block
    */
   updateChainShape_: function(targetCount) {
@@ -540,7 +538,7 @@ Blockly.Constants.Operators.EXPANDABLE_JOIN_MUTATOR_MIXIN = {
   },
 
   /**
-   * @param {number} targetCount
+   * @param {number} targetCount Desired number of inputs.
    * @this Blockly.Block
    */
   updateJoinShape_: function(targetCount) {
