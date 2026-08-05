@@ -295,6 +295,11 @@ Blockly.Constants.Operators.applyMutation_ = function(block, mutateFn) {
   var oldMutation = oldMutationDom && Blockly.Xml.domToText(oldMutationDom);
   mutateFn(block);
   if (block.rendered) {
+    // Newly-appended inputs need their empty-socket outline path created
+    // (normally only done once, in initSvg() when the block is first
+    // built) before render() can draw it - initSvg() is safe to call
+    // again, it skips anything already set up.
+    block.initSvg();
     block.render();
     block.bumpNeighbours_();
   }
